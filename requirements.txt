@@ -1,0 +1,99 @@
+# Fake Voice Detection System - Dependencies
+# Install with: pip install -r requirements.txt
+
+# ============================================================================
+# Core Dependencies
+# ============================================================================
+
+# GUI Framework
+PyQt6>=6.4.0
+
+# Audio Processing
+librosa>=0.10.0
+soundfile>=0.12.0
+pydub>=0.25.0
+
+# Signal Processing
+numpy>=1.24.0
+scipy>=1.10.0
+
+# ============================================================================
+# Deep Learning
+# ============================================================================
+
+# PyTorch (install appropriate version for your system)
+# For Apple Silicon (MPS): pip install torch torchvision torchaudio
+#   - MPS (Metal Performance Shaders) is automatically used on Apple Silicon
+#   - ResNet18 model will use MPS for acceleration on MacBook M4 and later
+# For CUDA: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# For CPU: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# For ROCm: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.4.2
+torch>=2.0.0
+torchvision>=0.15.0  # Required for ResNet18 model architecture and pre-trained weights
+
+# Speech Recognition
+openai-whisper>=20231117  # Using large-v2 model for best accuracy
+
+# For optimized Whisper on CUDA (optional)
+# faster-whisper>=0.9.0
+
+# ============================================================================
+# Machine Learning
+# ============================================================================
+
+# Core ML
+scikit-learn>=1.3.0
+
+# Gradient Boosting (optional, for stacking ensemble)
+xgboost>=2.0.0
+# lightgbm>=4.0.0
+
+# Hyperparameter Optimization
+optuna>=3.4.0
+
+# ============================================================================
+# Apple Silicon / MLX (macOS only, optional)
+# ============================================================================
+
+# Note: MPS (Metal Performance Shaders) is built into PyTorch and automatically used
+#       on Apple Silicon. No additional installation needed for MPS support.
+#       ResNet18 model will automatically use MPS on MacBook M4 and later.
+
+# Uncomment for MLX support (alternative to MPS):
+# mlx>=0.0.10
+# mlx-whisper>=0.0.1
+
+# ============================================================================
+# Utilities
+# ============================================================================
+
+# Progress bars (used in training script)
+tqdm>=4.65.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# System info
+psutil>=5.9.0
+
+# Dataset download (optional, for training)
+# kaggle>=1.5.0  # Uncomment if you want to download datasets via Kaggle CLI
+
+# ============================================================================
+# Development Dependencies (optional)
+# ============================================================================
+
+# Testing
+# pytest>=7.4.0
+# pytest-cov>=4.1.0
+
+# Code Quality
+# black>=23.0.0
+# isort>=5.12.0
+# flake8>=6.1.0
+# mypy>=1.5.0
+
+# Documentation
+# sphinx>=7.0.0
+# sphinx-rtd-theme>=1.3.0
+

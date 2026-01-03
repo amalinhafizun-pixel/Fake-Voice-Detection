@@ -1,0 +1,13 @@
+{
+  "overall_score": 0.41495509992001767,
+  "risk_level": "MEDIUM",
+  "confidence": "MEDIUM",
+  "component_scores": {
+    "deep_learning": 0.5503991842269897,
+    "behavioral": 0.39346299052238465,
+    "signal": 0.20534685935223548,
+    "linguistic": 0.4526789379531854,
+    "anomaly": 0.5
+  },
+  "interpretation": "Mixed indicators - manual review recommended."
+}

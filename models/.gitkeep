@@ -1,0 +1,9 @@
+# Model storage directory
+# This directory contains trained models and weights
+
+# Subdirectories:
+# - aasist/: AASIST model weights for spoof detection
+# - whisper/: Whisper model cache (auto-managed by library)
+# - anomaly/: Trained anomaly detection models
+# - ensemble/: Trained ensemble meta-models
+
