@@ -175,17 +175,46 @@ class FeatureEngineer:
 
 class FeatureAggregator:
     """
-    Aggregates multiple feature sets into a single feature vector.
+    Aggregates multiple feature sets into a single feature vector,
+    enhanced with temporal delta and delta-delta variations.
     """
     
-    def __init__(self, aggregation_stats: List[str] = None):
+    def __init__(self, aggregation_stats: List[str] = None, compute_dynamics: bool = True):
         """
         Initialize the aggregator.
         
         Args:
             aggregation_stats: Statistics to compute ('mean', 'std', 'min', 'max', 'percentile_25', 'percentile_75')
+            compute_dynamics: Whether to automatically inject velocity (delta) and acceleration (delta-delta) features
         """
         self.aggregation_stats = aggregation_stats or ['mean', 'std', 'min', 'max']
+        self.compute_dynamics = compute_dynamics
+    
+    def compute_delta_features(self, feat: np.ndarray, width: int = 3) -> np.ndarray:
+        """
+        Compute delta (velocity) and delta-delta (acceleration) features 
+        to capture unnatural, rigid transitions typical in synthetic voices.
+        """
+        if len(feat) < width:
+            return feat  # Not enough data points to compute derivatives
+        
+        # Calculate Delta (First Derivative / Velocity)
+        delta = np.zeros_like(feat)
+        n = (width - 1) // 2
+        for t in range(n, len(feat) - n):
+            numerator = sum(k * (feat[t + k] - feat[t - k]) for k in range(1, n + 1))
+            denominator = 2 * sum(k**2 for k in range(1, n + 1))
+            delta[t] = numerator / denominator
+            
+        # Calculate Delta-Delta (Second Derivative / Acceleration)
+        delta_delta = np.zeros_like(delta)
+        for t in range(n, len(delta) - n):
+            numerator = sum(k * (delta[t + k] - delta[t - k]) for k in range(1, n + 1))
+            denominator = 2 * sum(k**2 for k in range(1, n + 1))
+            delta_delta[t] = numerator / denominator
+            
+        # Stack original features, velocity, and acceleration together
+        return np.hstack([feat, delta, delta_delta])
     
     def aggregate(
         self,
@@ -209,6 +238,10 @@ class FeatureAggregator:
                 continue
             
             feat = np.asarray(feat).flatten()
+            
+            # UPGRADE: Inject transitional speech dynamics before processing statistics
+            if self.compute_dynamics:
+                feat = self.compute_delta_features(feat)
             
             for stat in self.aggregation_stats:
                 if stat == 'mean':
