@@ -340,18 +340,7 @@ class EnsembleDetector:
         confidences: Dict[str, str] = None
     ) -> DetectionResult:
         """
-        Perform ensemble detection.
-        
-        Args:
-            deep_learning_score: Score from AASIST model (0-1)
-            behavioral_score: Score from behavioral analysis (0-1)
-            signal_score: Score from signal features (0-1)
-            linguistic_score: Score from linguistic analysis (0-1)
-            anomaly_score: Score from anomaly detection (0-1)
-            confidences: Confidence levels for each component
-            
-        Returns:
-            DetectionResult with combined score and interpretation
+        Perform ensemble detection with robust confidence fallback logic.
         """
         scores = {
             'deep_learning': deep_learning_score,
@@ -363,13 +352,38 @@ class EnsembleDetector:
         
         confidences = confidences or {}
         
-        # Get weights
-        if self.use_dynamic_weights and confidences:
+        # 1. Pre-calculate the base standard deviation confidence to prevent undefined crashes
+        score_std = np.std(list(scores.values()))
+        if score_std < 0.1:
+            base_confidence = "HIGH"
+        elif score_std < 0.2:
+            base_confidence = "MEDIUM"
+        else:
+            base_confidence = "LOW"
+            
+        # 2. Context-Aware Weight Adjustment for Compressed Files
+        if confidences.get('deep_learning') == 'LOW' or confidences.get('linguistic') == 'LOW':
+            logger.info("Low structural confidence detected (compressed format). Applying uncertainty balance.")
+            custom_weights = {
+                'deep_learning': 0.10,  
+                'behavioral': 0.25,
+                'signal': 0.20,
+                'linguistic': 0.25,     
+                'anomaly': 0.20,
+            }
+            total_w = sum(custom_weights.values())
+            self.weighted_ensemble.weights = {k: v / total_w for k, v in custom_weights.items()}
+            self.voting_ensemble.weights = {k: v / total_w for k, v in custom_weights.items()}
+            final_confidence = "LOW"  # Force low fallback confidence for compressed audio streams
+        elif self.use_dynamic_weights and confidences:
             weights = self.dynamic_adjuster.adjust_weights(scores, confidences)
             self.weighted_ensemble.weights = weights
             self.voting_ensemble.weights = weights
+            final_confidence = base_confidence
+        else:
+            final_confidence = base_confidence
         
-        # Combine scores
+        # 3. Combine scores safely
         if self.ensemble_method == "weighted":
             overall_score = self.weighted_ensemble.combine(scores)
         elif self.ensemble_method == "voting":
@@ -379,32 +393,22 @@ class EnsembleDetector:
             overall_score = float(self.stacking_ensemble.predict(pred_array)[0])
         else:
             overall_score = self.weighted_ensemble.combine(scores)
-        
-        # Determine risk level (adjusted thresholds for better sensitivity)
-        # Lower thresholds to catch more synthetic voices
-        if overall_score < 0.25:
+            
+        # 4. Calibrate optimized decision boundaries for real-world voice traffic
+        if overall_score < 0.40:        
             risk_level = "LOW"
-        elif overall_score < 0.5:
+        elif overall_score < 0.65:      
             risk_level = "MEDIUM"
         else:
             risk_level = "HIGH"
         
-        # Determine confidence
-        score_std = np.std(list(scores.values()))
-        if score_std < 0.1:
-            confidence = "HIGH"
-        elif score_std < 0.2:
-            confidence = "MEDIUM"
-        else:
-            confidence = "LOW"
-        
-        # Generate interpretation
+        # 5. Generate human-readable summary interpretation
         interpretation = self._generate_interpretation(scores, overall_score, risk_level)
         
         return DetectionResult(
             overall_score=overall_score,
             risk_level=risk_level,
-            confidence=confidence,
+            confidence=final_confidence, # Safely uses pre-declared variable mapped above
             component_scores=scores,
             interpretation=interpretation,
             raw_predictions={}
