@@ -264,6 +264,20 @@ class MainWindow(QMainWindow):
         self.file_upload = FileUploadWidget()
         self.file_upload.file_selected.connect(self._on_file_selected)
         upload_layout.addWidget(self.file_upload)
+        # LIVE RECORDING EXTENSION
+        self.record_btn = QPushButton("🎙️ Speak On The Spot")
+        self.record_btn.setMinimumHeight(40)
+        self.record_btn.setStyleSheet("""
+            QPushButton { background-color: #3498db; color: white; border-radius: 6px; font-weight: bold; }
+            QPushButton:hover { background-color: #2980b9; }
+        """)
+        self.record_btn.clicked.connect(self._toggle_live_recording)
+        upload_layout.addWidget(self.record_btn)
+
+        # Initialize properties for live audio state tracker
+        from audio.recorder import LiveVoiceRecorder
+        self.live_recorder = LiveVoiceRecorder()
+        self.is_recording = False
         
         layout.addWidget(upload_group)
         
@@ -353,12 +367,59 @@ class MainWindow(QMainWindow):
     
     def _on_file_selected(self, file_path: str) -> None:
         """Handle file selection."""
+        self.file_path = file_path
         self.analyze_btn.setEnabled(True)
-        self.status_bar.showMessage(f"Selected: {file_path}")
+        self.status_bar.showMessage(f"Selected file: {file_path}")
+
+    def _toggle_live_recording(self) -> None:
+        """Manages the state machine for the live microphone button."""
+        import os
+        if not self.is_recording:
+            # Start Recording State
+            self.is_recording = True
+            self.record_btn.setText("🛑 Stop Speaking & Analyze")
+            self.record_btn.setStyleSheet("background-color: #e74c3c; color: white; border-radius: 6px; font-weight: bold;")
+            self.analyze_btn.setEnabled(False)
+            self.file_upload.setEnabled(False)
+            self.status_bar.showMessage("Listening... Speak clearly into your mic now.")
+            self.live_recorder.start_recording()
+        else:
+            # Stop Recording State
+            self.is_recording = False
+            self.record_btn.setText("🎙️ Speak On The Spot")
+            self.record_btn.setStyleSheet("background-color: #3498db; color: white; border-radius: 6px; font-weight: bold;")
+            
+            # Retrieve the location of the newly populated wav file
+            recorded_file_path = self.live_recorder.stop_recording()
+            
+            # Clean popup alerts if sound file is missing or zero bytes
+            if not recorded_file_path or not os.path.exists(recorded_file_path):
+                self.analyze_btn.setEnabled(True)
+                self.file_upload.setEnabled(True)
+                self.status_bar.showMessage("Recording failed: No voice signal detected.")
+                QMessageBox.warning(
+                    self, 
+                    "Microphone Error", 
+                    "No voice data was recorded.\n\n"
+                    "Please ensure your microphone is connected and unmuted."
+                )
+                return
+                
+            # SAFE FIX: Set the file path directly to the worker parameter variable
+            self.file_path = recorded_file_path
+            
+            # Re-enable UI controls
+            self.analyze_btn.setEnabled(True)
+            self.file_upload.setEnabled(True)
+            self.status_bar.showMessage("Live speech captured. Launching processing thread matrix...")
+            
+            # Trigger your pre-existing parallel analysis pipeline directly!
+            self._start_analysis()
     
     def _start_analysis(self) -> None:
-        """Start the analysis."""
-        file_path = self.file_upload.get_selected_file()
+        # Fallback: check if we have an active live microphone file path assigned
+        file_path = getattr(self, 'file_path', None) or self.file_upload.get_selected_file()
+        
         if not file_path:
             return
         
@@ -421,7 +482,6 @@ class MainWindow(QMainWindow):
         """Handle export completion."""
         self.status_bar.showMessage(f"Exported to: {file_path}")
 
-
 def run_gui(backend: Optional[str] = None) -> None:
     """
     Run the PyQt6 GUI application.
@@ -436,4 +496,3 @@ def run_gui(backend: Optional[str] = None) -> None:
     window.show()
     
     sys.exit(app.exec())
-
