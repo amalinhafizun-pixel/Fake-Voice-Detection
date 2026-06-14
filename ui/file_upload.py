@@ -1,7 +1,7 @@
 """
 File Upload Widget for PyQt6 GUI.
 
-Provides drag-and-drop and button-based file upload functionality.
+Provides drag-and-drop and button-based file upload functionality with media properties tracking.
 """
 
 from PyQt6.QtWidgets import (
@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from pathlib import Path
 from typing import Optional, List
+import wave
 
 
 class FileUploadWidget(QWidget):
@@ -84,6 +85,22 @@ class FileUploadWidget(QWidget):
         self.file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.file_label.setStyleSheet("color: #888; font-style: italic; margin-top: 10px;")
         layout.addWidget(self.file_label)
+
+        # UPGRADE: Add a dedicated audio properties badge container
+        self.meta_label = QLabel("")
+        self.meta_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.meta_label.setStyleSheet("""
+            QLabel {
+                color: #aaa;
+                font-size: 12px;
+                background-color: #222;
+                border-radius: 4px;
+                padding: 4px;
+                margin-top: 5px;
+            }
+        """)
+        self.meta_label.setVisible(False)
+        layout.addWidget(self.meta_label)
     
     def _browse_file(self) -> None:
         """Open file browser dialog."""
@@ -103,22 +120,44 @@ class FileUploadWidget(QWidget):
         self._set_file(file_path)
     
     def _set_file(self, file_path: str) -> None:
-        """Set the selected file."""
+        """Set the selected file and extract its core properties."""
         path = Path(file_path)
         
         if not path.exists():
             self.file_label.setText("File not found")
             self.file_label.setStyleSheet("color: #e74c3c;")
+            self.meta_label.setVisible(False)
             return
         
         if path.suffix.lower() not in self.SUPPORTED_FORMATS:
             self.file_label.setText(f"Unsupported format: {path.suffix}")
             self.file_label.setStyleSheet("color: #e74c3c;")
+            self.meta_label.setVisible(False)
             return
         
         self._selected_file = str(path)
-        self.file_label.setText(f"Selected: {path.name}")
+        self.file_label.setText(f"📂 Selected: {path.name}")
         self.file_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
+        
+        # UPGRADE: Extract .wav file properties to verify pipeline parameters
+        if path.suffix.lower() == '.wav':
+            try:
+                with wave.open(str(path), 'rb') as w:
+                    frames = w.getnframes()
+                    rate = w.getframerate()
+                    duration = frames / float(rate)
+                    channels = w.getnchannels()
+                    ch_mode = "Mono" if channels == 1 else "Stereo"
+                    
+                    meta_text = f"📊 Info: {duration:.2f}s | {rate} Hz | {ch_mode}"
+                    self.meta_label.setText(meta_text)
+                    self.meta_label.setVisible(True)
+            except Exception:
+                self.meta_label.setText("📊 Info: Standard Audio Format Stream")
+                self.meta_label.setVisible(True)
+        else:
+            self.meta_label.setText("📊 Info: Compression Encoded Audio Stream")
+            self.meta_label.setVisible(True)
         
         self.file_selected.emit(self._selected_file)
     
@@ -131,6 +170,7 @@ class FileUploadWidget(QWidget):
         self._selected_file = None
         self.file_label.setText("No file selected")
         self.file_label.setStyleSheet("color: #888; font-style: italic;")
+        self.meta_label.setVisible(False)
 
 
 class DropZone(QFrame):
@@ -205,4 +245,3 @@ class DropZone(QFrame):
         if urls:
             file_path = urls[0].toLocalFile()
             self.file_dropped.emit(file_path)
-
