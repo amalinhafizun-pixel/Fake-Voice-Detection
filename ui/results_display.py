@@ -127,7 +127,7 @@ class ResultsDisplay(QWidget):
     
     def display_result(self, result: Dict[str, Any]) -> None:
         """
-        Display detection result.
+        Display detection result with advanced feature breakdown.
         
         Args:
             result: Detection result dictionary
@@ -150,14 +150,24 @@ class ResultsDisplay(QWidget):
         # Update component scores
         self._clear_components()
         if 'component_scores' in result:
-            for name, score in result['component_scores'].items():
-                bar = ComponentBar(name.replace('_', ' ').title(), score)
+            for name, score_val in result['component_scores'].items():
+                # UPGRADE: Identify dynamic speech derivatives and provide intuitive formatting
+                display_name = name.replace('_', ' ').title()
+                if "delta" in name.lower():
+                    display_name = f"Temporal: {display_name}"
+                
+                bar = ComponentBar(display_name, score_val)
                 self.components_layout.addWidget(bar)
         
         # Update interpretation
         interpretation = result.get('interpretation', '')
+        
+        # UPGRADE: Check if dynamic speech artifacts triggered a deepfake flag
+        if score > 0.5 and any('delta' in k.lower() for k in result.get('component_scores', {}).keys()):
+            interpretation += " NOTE: Unnatural voice transitions detected in speech velocity/acceleration derivatives."
+            
         self.interpretation_label.setText(f"📋 {interpretation}")
-    
+        
     def _clear_components(self) -> None:
         """Clear component score widgets."""
         while self.components_layout.count():
