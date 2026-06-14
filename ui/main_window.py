@@ -40,44 +40,52 @@ class AnalysisWorker(QThread):
         self.backend = backend
     
     def run(self) -> None:
-        """Run the analysis."""
+        """Run the analysis using parallel processing execution threads."""
         try:
-            self.progress.emit("Loading audio file...", 10)
-            
+            self.progress.emit("Loading audio file...", 15)
             from audio.processor import AudioProcessor
             processor = AudioProcessor()
             audio_data = processor.load(self.file_path)
             
-            self.progress.emit("Extracting signal features...", 25)
+            # Setup detectors
             from detection.signal_features import SignalFeatureExtractor
-            signal_extractor = SignalFeatureExtractor(sample_rate=audio_data.sample_rate)
-            signal_features = signal_extractor.extract(audio_data.waveform)
-            signal_score = signal_extractor.compute_anomaly_score(signal_features)
-            
-            self.progress.emit("Running deep learning model...", 40)
             from detection.deep_learning import DeepLearningDetector
+            from detection.behavioral import BehavioralAnalyzer
+            from detection.linguistic import LinguisticAnalyzer
             from config import RESNET18_WEIGHTS_PATH, RESNET18_FULL_PATH
             import os
-            # Prefer full model if available, otherwise use weights
+            import concurrent.futures
+
+            signal_extractor = SignalFeatureExtractor(sample_rate=audio_data.sample_rate)
+            
             model_path = str(RESNET18_FULL_PATH) if os.path.exists(RESNET18_FULL_PATH) else str(RESNET18_WEIGHTS_PATH)
             dl_detector = DeepLearningDetector(model_path=model_path if os.path.exists(model_path) else None)
-            dl_result = dl_detector.detect(audio_data.waveform, audio_data.sample_rate)
-            
-            self.progress.emit("Analyzing behavioral patterns...", 55)
-            from detection.behavioral import BehavioralAnalyzer
             behavioral = BehavioralAnalyzer(sample_rate=audio_data.sample_rate)
-            behavioral_result = behavioral.analyze(audio_data.waveform)
             
-            self.progress.emit("Performing linguistic analysis...", 70)
-            from detection.linguistic import LinguisticAnalyzer
+            # Pass the custom backend selection to the analyzer if needed
             linguistic = LinguisticAnalyzer()
-            linguistic_result = linguistic.analyze(audio_data.waveform, audio_data.sample_rate)
-            
-            self.progress.emit("Running anomaly detection...", 85)
+
+            self.progress.emit("Executing multi-core machine learning matrix...", 40)
+
+            # OPTIMIZATION: Run all analytical sub-modules concurrently in a thread pool
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future_signal = executor.submit(signal_extractor.extract, audio_data.waveform)
+                future_dl = executor.submit(dl_detector.detect, audio_data.waveform, audio_data.sample_rate)
+                future_behavioral = executor.submit(behavioral.analyze, audio_data.waveform)
+                future_linguistic = executor.submit(linguistic.analyze, audio_data.waveform, audio_data.sample_rate)
+
+                # Gather concurrent results as they wrap up
+                signal_features = future_signal.result()
+                dl_result = future_dl.result()
+                behavioral_result = future_behavioral.result()
+                linguistic_result = future_linguistic.result()
+
+            self.progress.emit("Finalizing anomaly diagnostics...", 85)
+            signal_score = signal_extractor.compute_anomaly_score(signal_features)
             feature_vector = signal_features.to_vector()
+            
             from detection.anomaly_detection import AnomalyDetector
             anomaly_detector = AnomalyDetector()
-            # Pass signal_features object for better heuristic when not fitted
             anomaly_result = anomaly_detector.predict(feature_vector, signal_features=signal_features)
             
             self.progress.emit("Computing ensemble score...", 95)
@@ -104,7 +112,6 @@ class AnalysisWorker(QThread):
         except Exception as e:
             logger.exception("Analysis failed")
             self.error.emit(str(e))
-
 
 class MainWindow(QMainWindow):
     """

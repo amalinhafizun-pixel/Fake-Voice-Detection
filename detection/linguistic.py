@@ -106,7 +106,7 @@ class LinguisticAnalyzer:
     
     def __init__(
         self,
-        whisper_model: str = "large-v2",
+        whisper_model: str = "tiny",
         device: Optional[str] = None
     ):
         """
