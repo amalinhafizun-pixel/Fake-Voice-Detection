@@ -2,6 +2,7 @@
 AASIST
 Copyright (c) 2021-present NAVER Corp.
 MIT license
+Modified with Attention Dropout Regularization
 """
 
 import random
@@ -31,6 +32,9 @@ class GraphAttentionLayer(nn.Module):
 
         # dropout for inputs
         self.input_drop = nn.Dropout(p=0.2)
+
+        # UPGRADE: Structural attention dropout to prevent over-reliance on rigid node patterns
+        self.att_drop = nn.Dropout(p=kwargs.get("att_dropout", 0.1))
 
         # activate
         self.act = nn.SELU(inplace=True)
@@ -87,6 +91,9 @@ class GraphAttentionLayer(nn.Module):
         att_map = att_map / self.temp
 
         att_map = F.softmax(att_map, dim=-2)
+
+        # UPGRADE: Mask attention layout to prevent co-adaptation of features
+        att_map = self.att_drop(att_map)
 
         return att_map
 
