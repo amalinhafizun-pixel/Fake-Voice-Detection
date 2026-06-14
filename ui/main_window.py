@@ -59,11 +59,18 @@ class AnalysisWorker(QThread):
             signal_extractor = SignalFeatureExtractor(sample_rate=audio_data.sample_rate)
             
             model_path = str(RESNET18_FULL_PATH) if os.path.exists(RESNET18_FULL_PATH) else str(RESNET18_WEIGHTS_PATH)
-            dl_detector = DeepLearningDetector(model_path=model_path if os.path.exists(model_path) else None)
+            
+            # OPTIMIZATION: Pass your UI dropdown choice (self.backend) to your deep learning models
+            dl_detector = DeepLearningDetector(
+                model_path=model_path if os.path.exists(model_path) else None,
+                device=self.backend
+            )
             behavioral = BehavioralAnalyzer(sample_rate=audio_data.sample_rate)
             
-            # Pass the custom backend selection to the analyzer if needed
-            linguistic = LinguisticAnalyzer()
+            # OPTIMIZATION: Pass your hardware backend choice to your Whisper model
+            linguistic = LinguisticAnalyzer(
+                device=self.backend
+            )
 
             self.progress.emit("Executing multi-core machine learning matrix...", 40)
 
